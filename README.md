@@ -305,5 +305,8 @@ This project is licensed under the **MIT License** — see the [LICENSE](LICENSE
 
 ## Author
 
-**Ken Madrinan**
+**Ken Madrinan** — [@ken-dot4](https://github.com/ken-dot4)
+
 ITE 185 — Lab 1: Building an HTTP Server using Socket
+
+Repository: <https://github.com/ken-dot4/my-bsl-http-server>

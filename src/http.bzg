@@ -1,0 +1,210 @@
+// ============================================================
+//  BSL HTTP Server
+//  Lab 1 - Building an HTTP Server using Socket
+//  Course: ITE 185
+//  Author: Ken Madrinan
+//
+//  A minimal HTTP/1.1 web server written from scratch in the
+//  Bonezegei Scripting Language using the BSL Socket Library.
+//
+//  Routes:
+//    GET /        -> 200 OK        (home page)
+//    GET /about   -> 200 OK        (about page)
+//    GET /<other> -> 404 Not Found (custom error page)
+//
+//  Run:  bonezegei src/http.bzg
+// ============================================================
+
+// Include the BSL socket library (installed via "bzg install socket")
+include("lib/socket.bzg");
+
+// ------------------------------------------------------------
+// Helper: extract the requested path from a raw HTTP request.
+//
+// A raw request begins with a request line in the form:
+//
+//     GET /about?id=1 HTTP/1.1
+//     ^   ^           ^
+//     |   |           `-- protocol version
+//     |   `-- the path we want
+//     `-- HTTP method
+//
+// We walk the string with substr() to slice out the middle
+// field, then trim off any query string and trailing slash so
+// that "/about", "/about/" and "/about?x=1" all route the same.
+// ------------------------------------------------------------
+function requestPath(req) {
+
+    var n = sizeof(req);
+    var i = 0;
+
+    // Skip over the HTTP method (everything up to the first space)
+    while (i < n && substr(req, i, 1) != " ") {
+        i = i + 1;
+    }
+    i = i + 1; // step past that space
+
+    // Capture the path (everything up to the next space)
+    var start = i;
+    while (i < n && substr(req, i, 1) != " ") {
+        i = i + 1;
+    }
+
+    var path = substr(req, start, i - start);
+
+    // Drop the query string, if any: "/about?id=1" -> "/about"
+    var p = 0;
+    var len = sizeof(path);
+    while (p < len) {
+        if (substr(path, p, 1) == "?") {
+            path = substr(path, 0, p);
+            len = p;
+        }
+        p = p + 1;
+    }
+
+    // Drop a trailing slash, but never turn "/" into ""
+    len = sizeof(path);
+    if (len > 1 && substr(path, len - 1, 1) == "/") {
+        path = substr(path, 0, len - 1);
+    }
+
+    if (sizeof(path) == 0) {
+        path = "/";
+    }
+
+    return path;
+}
+
+// ------------------------------------------------------------
+// 1. Initialize Socket
+// ------------------------------------------------------------
+if (socket_init() < 0) {
+    print("Socket Initialization Failed\n");
+} else {
+    print("Socket Ready\n");
+}
+
+// ------------------------------------------------------------
+// 2. Create Socket Server
+// ------------------------------------------------------------
+var server = socket_create();
+if (server < 0) {
+    print("Socket Creation Failed\n");
+}
+
+// ------------------------------------------------------------
+// 3. Bind Server to Port 8080
+// ------------------------------------------------------------
+if (socket_bind(server, 0, 8080) < 0) {
+    print("Socket Bind Failed.\n");
+}
+
+// ------------------------------------------------------------
+// 4. Listen for incoming connections
+// ------------------------------------------------------------
+if (socket_listen(server, 5) < 0) {
+    print("socket_listen() Failed.\n");
+}
+
+print("Server running on http://localhost:8080/\n");
+print("Press Ctrl+C to stop the server.\n");
+
+while (1) {
+
+    // --------------------------------------------------------
+    // 5. Accept Client Connection
+    // --------------------------------------------------------
+    var client = socket_accept(server);
+    print("Client connected!\n");
+
+    var data = socket_read(client, 1024);
+
+    if (sizeof(data) >= 0) {
+        print("Received Request:\n" + data);
+
+        var BODY = "";
+        var HTTP = "";
+
+        // ----------------------------------------------------
+        // Route Handling Logic
+        // ----------------------------------------------------
+        var path = requestPath(data);
+        print("Routing path: " + path + "\n");
+
+        // Route: /  (default landing page)
+        if (path == "/") {
+
+            BODY = "<!DOCTYPE html><html><head><title>BSL Server - Home</title></head>"
+                 + "<body style='font-family:sans-serif; max-width:640px; margin:60px auto; padding:0 20px;'>"
+                 + "<h1 style='color:#0f766e;'>Welcome to BSL HTTP Server</h1>"
+                 + "<p>This is the default landing page served on route '/'.</p>"
+                 + "<p>This server was built from scratch in the Bonezegei Scripting Language "
+                 + "using raw TCP sockets - no web framework involved.</p>"
+                 + "<hr>"
+                 + "<p>Available routes:</p>"
+                 + "<ul>"
+                 + "<li><a href='/'>/</a> - this home page</li>"
+                 + "<li><a href='/about'>/about</a> - about this project</li>"
+                 + "<li><a href='/anything'>/anything</a> - any unmapped route returns 404</li>"
+                 + "</ul>"
+                 + "</body></html>";
+
+            HTTP = "HTTP/1.1 200 OK\r\n"
+                 + "Content-Type: text/html\r\n"
+                 + "Content-Length: " + sizeof(BODY) + "\r\n"
+                 + "Connection: close\r\n\r\n";
+
+        // Route: /about
+        } else if (path == "/about") {
+
+            BODY = "<!DOCTYPE html><html><head><title>BSL Server - About</title></head>"
+                 + "<body style='font-family:sans-serif; max-width:640px; margin:60px auto; padding:0 20px;'>"
+                 + "<h1 style='color:#0f766e;'>About BSL HTTP Server</h1>"
+                 + "<p>This page contains information about the BSL HTTP Server project.</p>"
+                 + "<h2>The Project</h2>"
+                 + "<p>A low-level HTTP/1.1 web server implemented from scratch using the "
+                 + "BSL Socket Library. It binds a TCP socket to port 8080, accepts client "
+                 + "connections, parses the request line, and writes raw HTTP responses back "
+                 + "to the socket.</p>"
+                 + "<h2>The Developer</h2>"
+                 + "<ul>"
+                 + "<li><b>Name:</b> Ken Madrinan</li>"
+                 + "<li><b>Course:</b> ITE 185</li>"
+                 + "<li><b>Activity:</b> Lab 1 - Building an HTTP Server using Socket</li>"
+                 + "</ul>"
+                 + "<p><a href='/'>&larr; Back to Home</a></p>"
+                 + "</body></html>";
+
+            HTTP = "HTTP/1.1 200 OK\r\n"
+                 + "Content-Type: text/html\r\n"
+                 + "Content-Length: " + sizeof(BODY) + "\r\n"
+                 + "Connection: close\r\n\r\n";
+
+        // Route: anything else -> 404
+        } else {
+
+            BODY = "<!DOCTYPE html><html><head><title>404 Not Found</title></head>"
+                 + "<body style='font-family:sans-serif; max-width:640px; margin:60px auto; padding:0 20px;'>"
+                 + "<h1 style='color:#e11d48;'>404 - Page Not Found</h1>"
+                 + "<p>The requested route does not exist on this BSL Server.</p>"
+                 + "<p><a href='/'>&larr; Back to Home</a></p>"
+                 + "</body></html>";
+
+            HTTP = "HTTP/1.1 404 Not Found\r\n"
+                 + "Content-Type: text/html\r\n"
+                 + "Content-Length: " + sizeof(BODY) + "\r\n"
+                 + "Connection: close\r\n\r\n";
+        }
+
+        // --------------------------------------------------------
+        // 6. Send the response and close the client connection
+        // --------------------------------------------------------
+        socket_write(client, HTTP + BODY, sizeof(HTTP + BODY));
+        socket_close(client);
+
+        gc(); // Manual Garbage Collection
+    }
+}
+
+socket_cleanup();

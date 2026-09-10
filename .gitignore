@@ -1,0 +1,5 @@
+# BSL socket library, installed locally via "bzg install socket".
+# include("lib/socket.bzg") resolves relative to the working directory,
+# so this folder must exist locally - but it is a dependency, not source,
+# and contains a platform-specific binary (socket.dll). Do not commit it.
+lib/
